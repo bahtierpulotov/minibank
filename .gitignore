@@ -1,0 +1,56 @@
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Database
+db.sqlite3
+*.sqlite3
+
+# Django
+*.log
+*.pot
+*.pyc
+local_settings.py
+migrations/
+!*/migrations/__init__.py   # ин файлро истисно накунед
+
+# Environment variables
+.env
+.env.local
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets and keys
+SECRET_KEY.txt
+*.key
+*.pem
+
+# Media and static files (if any)
+media/
+staticfiles/
+
+# Postman (агар коллексияро ҷудо нигоҳ дошта мехоҳед, метавонед .gitignore кунед)
+postman_collection.json
