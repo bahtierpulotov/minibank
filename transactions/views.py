@@ -1,10 +1,12 @@
 from rest_framework import generics, status, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from django.db import transaction as db_transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from decimal import Decimal
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 
 from .models import Transaction
 from .serializers import TransactionSerializer, TopUpSerializer, TransferSerializer
@@ -13,23 +15,42 @@ from notifications.models import Notification
 
 
 class TransactionListAPIView(generics.ListAPIView):
-    queryset = Transaction.objects.all().order_by('-created_at')
     serializer_class = TransactionSerializer
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'transaction_type', 'currency', 'sender_wallet', 'receiver_wallet']
     search_fields = ['description', 'sender_wallet__wallet_number', 'receiver_wallet__wallet_number']
     ordering_fields = ['amount', 'created_at']
 
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return Transaction.objects.all().order_by('-created_at')
+        return (
+            Transaction.objects.filter(sender_wallet__user=user) |
+            Transaction.objects.filter(receiver_wallet__user=user)
+        ).order_by('-created_at')
+
 
 class TransactionDetailAPIView(generics.RetrieveAPIView):
-    queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
+    permission_classes = [IsAuthenticated]
 
-from drf_spectacular.utils import extend_schema
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return Transaction.objects.all()
+        return (
+            Transaction.objects.filter(sender_wallet__user=user) |
+            Transaction.objects.filter(receiver_wallet__user=user)
+        )
+
 
 class TopUpAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
-        request=TransferSerializer,
+        request=TopUpSerializer,
         responses={200: TransactionSerializer}
     )
     @db_transaction.atomic
@@ -72,10 +93,9 @@ class TopUpAPIView(APIView):
         return Response(TransactionSerializer(transaction_obj).data, status=status.HTTP_200_OK)
 
 
-
-
-
 class TransferAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         request=TransferSerializer,
         responses={200: TransactionSerializer}
@@ -97,7 +117,10 @@ class TransferAPIView(APIView):
             profile.is_blocked = True
             profile.blocked_at = timezone.now()
             profile.save()
-            return Response({"error": "Маблағ аз 100,000 зиёд аст. Ҳисоби шумо блок шуд."}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"error": "Маблағ аз 100,000 зиёд аст. Ҳисоби шумо блок шуд."},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         sender_wallet.balance -= amount
         receiver_wallet.balance += amount
